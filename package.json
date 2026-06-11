@@ -1,0 +1,14 @@
+{
+  "name": "slack-feedback-bot",
+  "version": "1.0.0",
+  "description": "Slack feedback bot using Socket Mode",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js"
+  },
+  "dependencies": {
+    "@slack/bolt": "^4.4.0",
+    "dotenv": "^16.4.7"
+  }
+}
