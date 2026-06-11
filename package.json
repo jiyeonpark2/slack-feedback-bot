@@ -8,6 +8,7 @@
     "dev": "node --watch app.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
     "@slack/bolt": "^4.4.0",
     "dotenv": "^16.4.7"
   }
