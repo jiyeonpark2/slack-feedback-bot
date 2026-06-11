@@ -134,6 +134,12 @@ app.event('app_mention', async ({ event, client, say }) => {
   }
 });
 
+// /피드백 슬래시 커맨드 처리
+app.command('/피드백', async ({ ack, respond }) => {
+  await ack();
+  await respond('피드백봇이 작동 중입니다!');
+});
+
 // DM 메시지 처리 (Messages 탭)
 app.message(async ({ message, client, say }) => {
   // 봇 메시지, 서브타입(파일 공유 등) 무시
