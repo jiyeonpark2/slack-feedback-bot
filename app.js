@@ -81,23 +81,29 @@ async function analyzeBannerWithClaude(imageBase64) {
   return result.response.text();
 }
 
+// Bolt 전역 오류 핸들러 — 프레임워크가 내부적으로 잡은 에러를 콘솔에 출력
+app.error(async (error) => {
+  console.error('[Bolt 오류]', error);
+});
+
 // 봇 멘션 이벤트 처리
 app.event('app_mention', async ({ event, client, say }) => {
+  console.log('[app_mention] 이벤트 수신:', { user: event.user, channel: event.channel, text: event.text });
+
   const { text, user, ts, channel, thread_ts } = event;
 
   // 멘션 태그를 제거하고 순수 메시지만 추출
   const feedbackText = text.replace(/<@[A-Z0-9]+>/g, '').trim();
 
-  // 빈 멘션이면 사용법 안내
-  if (!feedbackText) {
-    await say({
-      text: '피드백을 남겨주세요! 예시: `@피드백봇 앱이 더 빠르면 좋겠어요`',
-      thread_ts: thread_ts || ts,
-    });
-    return;
-  }
-
   try {
+    // 빈 멘션이면 사용법 안내
+    if (!feedbackText) {
+      await say({
+        text: '피드백을 남겨주세요! 예시: `@피드백봇 앱이 더 빠르면 좋겠어요`',
+        thread_ts: thread_ts || ts,
+      });
+      return;
+    }
     // 피드백 저장
     const feedback = {
       user,
