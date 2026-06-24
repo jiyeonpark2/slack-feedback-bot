@@ -59,13 +59,18 @@ async function downloadImageBase64(imageUrl) {
 
 // Gemini로 배너 디자인 분석
 async function analyzeBannerWithClaude(imageBase64) {
+  console.log('[Gemini] API 호출 시작');
   const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-  const result = await model.generateContent([
-    {
-      inlineData: { data: imageBase64, mimeType: 'image/png' },
-    },
-    `이 배너 디자인에 대한 전문적인 피드백을 한국어로 제공해주세요.
+  const TIMEOUT_MS = 30000;
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`Gemini API 응답 없음 (${TIMEOUT_MS / 1000}초 초과)`)), TIMEOUT_MS)
+  );
+
+  const result = await Promise.race([
+    model.generateContent([
+      { inlineData: { data: imageBase64, mimeType: 'image/png' } },
+      `이 배너 디자인에 대한 전문적인 피드백을 한국어로 제공해주세요.
 
 다음 항목을 중심으로 분석해주세요:
 1. *시각적 계층 구조*: 정보 우선순위와 시선 흐름
@@ -76,9 +81,22 @@ async function analyzeBannerWithClaude(imageBase64) {
 6. *개선 제안*: 구체적인 개선 방향 2~3가지
 
 간결하고 실용적인 피드백으로 작성해주세요.`,
+    ]),
+    timeoutPromise,
   ]);
 
-  return result.response.text();
+  console.log('[Gemini] 응답 수신, 텍스트 추출 중');
+
+  const blockReason = result.response.promptFeedback?.blockReason;
+  if (blockReason) {
+    throw new Error(`Gemini 안전 필터에 의해 차단됨: ${blockReason}`);
+  }
+
+  const text = result.response.text();
+  if (!text) throw new Error('Gemini 응답이 비어있습니다.');
+
+  console.log('[Gemini] 분석 완료');
+  return text;
 }
 
 // Bolt 전역 오류 핸들러 — 프레임워크가 내부적으로 잡은 에러를 콘솔에 출력
@@ -242,9 +260,13 @@ app.command('/피드백', async ({ command, ack, respond }) => {
         return;
       }
 
+      console.log('[/피드백] Figma 이미지 가져오는 중:', parsed);
       const imageUrl = await getFigmaImageUrl(parsed.fileKey, parsed.nodeId);
+      console.log('[/피드백] 이미지 다운로드 중');
       const imageBase64 = await downloadImageBase64(imageUrl);
+      console.log('[/피드백] Gemini 분석 호출');
       const analysis = await analyzeBannerWithClaude(imageBase64);
+      console.log('[/피드백] 분석 완료, Slack에 전송 중');
 
       await respond({
         response_type: 'in_channel',
