@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { App } = require('@slack/bolt');
-const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
@@ -8,7 +8,7 @@ const app = new App({
   socketMode: true,
 });
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // 수집된 피드백을 메모리에 임시 보관 (재시작 시 초기화)
 const feedbackStore = [];
@@ -57,23 +57,15 @@ async function downloadImageBase64(imageUrl) {
   return Buffer.from(buffer).toString('base64');
 }
 
-// Claude로 배너 디자인 분석
+// Gemini로 배너 디자인 분석
 async function analyzeBannerWithClaude(imageBase64) {
-  const stream = anthropic.messages.stream({
-    model: 'claude-opus-4-8',
-    max_tokens: 2048,
-    thinking: { type: 'adaptive' },
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: 'image/png', data: imageBase64 },
-          },
-          {
-            type: 'text',
-            text: `이 배너 디자인에 대한 전문적인 피드백을 한국어로 제공해주세요.
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+  const result = await model.generateContent([
+    {
+      inlineData: { data: imageBase64, mimeType: 'image/png' },
+    },
+    `이 배너 디자인에 대한 전문적인 피드백을 한국어로 제공해주세요.
 
 다음 항목을 중심으로 분석해주세요:
 1. *시각적 계층 구조*: 정보 우선순위와 시선 흐름
@@ -84,15 +76,9 @@ async function analyzeBannerWithClaude(imageBase64) {
 6. *개선 제안*: 구체적인 개선 방향 2~3가지
 
 간결하고 실용적인 피드백으로 작성해주세요.`,
-          },
-        ],
-      },
-    ],
-  });
+  ]);
 
-  const msg = await stream.finalMessage();
-  const textBlock = msg.content.find((b) => b.type === 'text');
-  return textBlock ? textBlock.text : '분석 결과를 가져올 수 없습니다.';
+  return result.response.text();
 }
 
 // 봇 멘션 이벤트 처리
@@ -231,8 +217,8 @@ app.command('/피드백', async ({ command, ack, respond }) => {
       await respond({ text: '⚠️ FIGMA_ACCESS_TOKEN이 설정되지 않았습니다. .env 파일을 확인해주세요.' });
       return;
     }
-    if (!process.env.ANTHROPIC_API_KEY) {
-      await respond({ text: '⚠️ ANTHROPIC_API_KEY가 설정되지 않았습니다. .env 파일을 확인해주세요.' });
+    if (!process.env.GEMINI_API_KEY) {
+      await respond({ text: '⚠️ GEMINI_API_KEY가 설정되지 않았습니다. .env 파일을 확인해주세요.' });
       return;
     }
 
